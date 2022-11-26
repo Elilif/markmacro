@@ -179,6 +179,8 @@ This function has the following usages:
 2. mark all lines in a secondary region when it is active.
 3. mark all lines in the buffer by default."
   (interactive)
+  (when rectangle-mark-mode
+    (markmacro-secondary-region-set))
   (let ((bound (cond
                 ((region-active-p)
                  (cons (region-beginning) (region-end)))
