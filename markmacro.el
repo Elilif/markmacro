@@ -92,7 +92,7 @@
 
 (defvar-local markmacro-overlays '())
 (defvar-local markmacro-start-overlay nil)
-
+(defvar-local markmacro-rect-used nil)
 (defvar-local markmacro-rect-start-point nil)
 (defvar-local markmacro-rect-overlays '())
 
@@ -312,6 +312,8 @@ end column."
 (defun markmacro-secondary-region-set ()
   "Create secondary selection or a marker if no region available."
   (interactive)
+  (when rectangle-mark-mode
+    (setq-local markmacro-rect-used t))
   (if (region-active-p)
       (progn
         (secondary-selection-from-region)
@@ -344,11 +346,17 @@ Usage:
       (while (search-forward target sec-region-end t)
         (let ((mstart (match-beginning 0))
               (mend (match-end 0)))
-          (when (markmacro-cursor-in-secondary-region-p)
-            (if (and (<= mstart current-point)
-                     (>= mend current-point))
-                (setq temp-bound (cons mstart mend))
-              (push (cons mstart mend) mark-bounds))))))
+          (cond
+           (markmacro-rect-used
+            (when (markmacro-cursor-in-secondary-region-p)
+              (if (and (<= mstart current-point)
+                       (>= mend current-point))
+                  (setq temp-bound (cons mstart mend))
+                (push (cons mstart mend) mark-bounds))))
+           (t (if (and (<= mstart current-point)
+                       (>= mend current-point))
+                  (setq temp-bound (cons mstart mend))
+                (push (cons mstart mend) mark-bounds)))))))
     (add-to-list 'mark-bounds temp-bound t)
 
     (dolist (bound mark-bounds)
@@ -398,6 +406,7 @@ Usage:
 
 (defun markmacro-exit ()
   (interactive)
+  (setq-local markmacro-rect-used nil)
   (markmacro-delete-overlays)
 
   (delete-overlay mouse-secondary-overlay)
