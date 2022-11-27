@@ -93,6 +93,8 @@
 (defvar-local markmacro-overlays '())
 (defvar-local markmacro-start-overlay nil)
 (defvar-local markmacro-rect-used nil)
+(defvar-local markmacro-mark-target-orig-info nil)
+(defvar-local markmacro-mark-target-last nil)
 
 (defface markmacro-mark-face
   '((t (:foreground "White" :background "#007aff" :bold t)))
@@ -298,7 +300,7 @@ Usage:
 
 (defun markmacro-apply-all ()
   (interactive)
-  (markmacro-apply t))
+  (markmacro-apply (if markmacro-mark-target-orig-info nil t)))
 
 (defun markmacro-apply-all-except-first ()
   (interactive)
@@ -318,21 +320,77 @@ Usage:
 
 (defun markmacro-exit ()
   (interactive)
+  (advice-remove 'keyboard-quit #'markmacro-exit)
   (setq-local markmacro-rect-used nil)
   (markmacro-delete-overlays)
-
+  
   (delete-overlay mouse-secondary-overlay)
   (setq mouse-secondary-start (make-marker))
   (move-marker mouse-secondary-start (point))
 
+  (setq markmacro-mark-target-orig-info nil)
+  
   (deactivate-mark t))
 
 (defun markmacro-delete-overlays ()
   (when markmacro-overlays
     (dolist (overlay markmacro-overlays)
       (delete-overlay overlay))
-    (setq-local markmacro-overlays nil)
-    (advice-remove 'keyboard-quit #'markmacro-exit)))
+    (setq-local markmacro-overlays nil)))
+
+
+(defun markmacro-mark-target (direction)
+  (when-let* ((lc last-command)
+              (tc this-command)
+              markmacro-mark-target-orig-info)
+    (unless (eq tc lc)
+      (goto-char (if (eq tc 'markmacro-mark-current-or-next-target)
+                     (overlay-end markmacro-mark-target-last)
+                   (overlay-start markmacro-mark-target-last)))
+      (setq markmacro-mark-target-last (car (last markmacro-overlays)))))
+  (cond
+   (markmacro-mark-target-orig-info
+    (funcall direction (car markmacro-mark-target-orig-info) nil)
+    (let* ((beg-pos (match-beginning 0))
+           (end-pos (match-end 0))
+           (ov (make-overlay beg-pos end-pos)))
+      (overlay-put ov 'face 'markmacro-mark-face)
+      (add-to-list 'markmacro-overlays ov t)))
+   (t
+    (when-let* ((target (if (use-region-p)
+                            (buffer-substring-no-properties
+                             (region-beginning)
+                             (region-end))
+                          (thing-at-point 'word)))
+                (target-bound (if (use-region-p)
+                                  (cons (region-beginning) (region-end))
+                                (bounds-of-thing-at-point 'word)))
+                (ov (make-overlay (car target-bound) (cdr target-bound))))
+      (deactivate-mark t)
+      (advice-add 'keyboard-quit :before #'markmacro-exit)
+      (advice-add 'kmacro-start-macro :before #'markmacro-mark-target-goto-orig-pos)
+      (setq markmacro-mark-target-orig-info
+            (cons target (car target-bound)))
+      (goto-char (if (eq this-command 'markmacro-mark-current-or-next-target)
+                     (cdr target-bound)
+                   (car target-bound)))
+      (overlay-put ov 'face 'markmacro-mark-face)
+      (add-to-list 'markmacro-overlays ov t)
+      (setq markmacro-mark-target-last (car markmacro-overlays)))))
+  t)
+
+(defun markmacro-mark-current-or-next-target ()
+  (interactive)
+  (markmacro-mark-target 'search-forward))
+
+(defun markmacro-mark-current-or-previous-target ()
+  (interactive)
+  (markmacro-mark-target 'search-backward))
+
+(defun markmacro-mark-target-goto-orig-pos (_arg)
+  (when markmacro-mark-target-orig-info
+    (goto-char (cdr markmacro-mark-target-orig-info)))
+  (advice-remove 'kmacro-start-macro #'markmacro-mark-target-goto-orig-pos))
 
 (provide 'markmacro)
 
