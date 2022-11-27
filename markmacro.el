@@ -93,16 +93,9 @@
 (defvar-local markmacro-overlays '())
 (defvar-local markmacro-start-overlay nil)
 (defvar-local markmacro-rect-used nil)
-(defvar-local markmacro-rect-start-point nil)
-(defvar-local markmacro-rect-overlays '())
 
 (defface markmacro-mark-face
   '((t (:foreground "White" :background "#007aff" :bold t)))
-  "Face for marked regions."
-  :group 'markmacro)
-
-(defface markmacro-mark-rect-face
-  '((t (:foreground "White" :background "coral" :bold t)))
   "Face for marked regions."
   :group 'markmacro)
 
@@ -120,31 +113,11 @@ See `thing-at-point' for more information."
           (const :tag "Num" number))
   :group 'markmacro)
 
-(cl-defmacro with-markmacro-rect (&rest body)
-  `(progn
-     (remove-hook 'post-command-hook #'markmacro-rect-monitor-post-command t)
-
-     (save-excursion
-       ,@body)
-
-     (markmacro-rect-delete-overlays)))
-
-(cl-defmacro with-markmacro-rect-mark (&rest body)
-  `(progn
-     (remove-hook 'post-command-hook #'markmacro-rect-monitor-post-command t)
-     (markmacro-delete-overlays)
-
-     ,@body
-
-     (markmacro-rect-delete-overlays)
-
-     (markmacro-select-last-overlay)))
-
 (defun markmacro-mark-words ()
   (interactive)
   (let ((bound (if (region-active-p)
                    (cons (region-beginning) (region-end))
-                 (bounds-of-thing-at-point 'symbol)))
+                 (bounds-of-thing-at-point 'word)))
         (mark-bounds '()))
     (when bound
       (when (region-active-p)
@@ -216,75 +189,6 @@ This function has the following usages:
           (add-to-list 'markmacro-overlays overlay t)))
 
       (markmacro-select-last-overlay))))
-
-(defun markmacro-mark-imenus ()
-  (interactive)
-  (let ((bound (if (region-active-p)
-                   (cons (region-beginning) (region-end))
-                 (cons (point-min) (point-max))))
-        (mark-bounds '()))
-    (when bound
-      (when (region-active-p)
-        (deactivate-mark))
-
-      (let* ((mark-bound-start (car bound))
-             (mark-bound-end (cdr bound))
-             (candidates (markmacro-imenu-get-candidates))
-             current-bound)
-        (save-excursion
-          (goto-char mark-bound-start)
-          (while (< (point) mark-bound-end)
-            (dolist (candidate candidates)
-              (when (= (point) (cadr candidate))
-                (when (search-forward (car candidate) (point-at-eol) t)
-                  (setq current-bound (cons (save-excursion
-                                              (backward-char (length (car candidate)))
-                                              (point))
-                                            (point)))
-                  (add-to-list 'mark-bounds current-bound t))))
-
-            (forward-line))
-          ))
-
-      (dolist (bound mark-bounds)
-        (let* ((overlay (make-overlay (car bound) (cdr bound))))
-          (overlay-put overlay 'face 'markmacro-mark-face)
-          (add-to-list 'markmacro-overlays overlay t)))
-
-      (markmacro-select-last-overlay))))
-
-(defun markmacro-imenu-get-candidates ()
-  (mapcar (lambda (info) (list (car info) (marker-position (cdr info))))
-          (let* ((index (ignore-errors (imenu--make-index-alist t))))
-            (when index
-              (markmacro-imenu-build-candidates
-               (delete (assoc "*Rescan*" index) index))))))
-
-(defun markmacro-imenu-build-candidates (alist)
-  (cl-remove-if
-   (lambda (c)
-     (or (string-equal (car c) "Types")
-         (string-equal (car c) "Variables")
-         ))
-   (cl-loop for elm in alist
-            nconc (cond
-                   ((imenu--subalist-p elm)
-                    (markmacro-imenu-build-candidates
-                     (cl-loop for (e . v) in (cdr elm) collect
-                              (cons
-                               e
-                               (if (integerp v) (copy-marker v) v)))))
-                   ((listp (cdr elm))
-                    (and elm (list elm)))
-                   (t
-                    (and (cdr elm)
-                         (setcdr elm (pcase (cdr elm)
-                                       ((and ov (pred overlayp))
-                                        (copy-overlay ov))
-                                       ((and mk (or (pred markerp)
-                                                    (pred integerp)))
-                                        (copy-marker mk))))
-                         (list elm)))))))
 
 (defun markmacro-cursor-in-secondary-region-p ()
   "Return a number if current cursor is in a secondary region.
@@ -423,92 +327,6 @@ Usage:
       (delete-overlay overlay))
     (setq-local markmacro-overlays nil)
     (advice-remove 'keyboard-quit #'markmacro-exit)))
-
-(defun markmacro-rect-set ()
-  (interactive)
-  (setq-local markmacro-rect-start-point (point))
-  (add-hook 'post-command-hook #'markmacro-rect-monitor-post-command nil t)
-  (message "markmacro set rectangle start point."))
-
-(defun markmacro-rect-delete ()
-  (interactive)
-  (with-markmacro-rect
-   (dolist (overlay markmacro-rect-overlays)
-     (delete-region (overlay-start overlay) (overlay-end overlay)))))
-
-(defun markmacro-rect-replace (new-string)
-  (interactive "sReplace with: ")
-  (with-markmacro-rect
-   (dolist (overlay markmacro-rect-overlays)
-     (delete-region (overlay-start overlay) (overlay-end overlay))
-     (goto-char (overlay-start overlay))
-     (insert new-string))))
-
-(defun markmacro-rect-insert (new-string)
-  (interactive "sInsert with: ")
-  (with-markmacro-rect
-   (dolist (overlay markmacro-rect-overlays)
-     (goto-char (overlay-start overlay))
-     (insert new-string))))
-
-(defun markmacro-rect-mark-columns ()
-  (interactive)
-  (with-markmacro-rect-mark
-   (dolist (rect-overlay markmacro-rect-overlays)
-     (let ((overlay (make-overlay (overlay-start rect-overlay) (overlay-end rect-overlay))))
-       (overlay-put overlay 'face 'markmacro-mark-face)
-       (add-to-list 'markmacro-overlays overlay t)))))
-
-(defun markmacro-rect-mark-symbols ()
-  (interactive)
-  (with-markmacro-rect-mark
-   (dolist (rect-overlay markmacro-rect-overlays)
-     (let* ((overlay-bound (save-excursion
-                             (goto-char (overlay-start rect-overlay))
-                             (bounds-of-thing-at-point 'symbol)))
-            overlay)
-       (when overlay-bound
-         (setq overlay (make-overlay (car overlay-bound) (cdr overlay-bound)))
-         (overlay-put overlay 'face 'markmacro-mark-face)
-         (add-to-list 'markmacro-overlays overlay t))
-       ))))
-
-(defun markmacro-rect-delete-overlays ()
-  (when markmacro-rect-overlays
-    (dolist (overlay markmacro-rect-overlays)
-      (delete-overlay overlay))
-    (setq-local markmacro-rect-overlays nil)))
-
-(defun markmacro-rect-monitor-post-command ()
-  (if (eq this-command 'keyboard-quit)
-      (progn
-        (markmacro-rect-delete-overlays)
-        (remove-hook 'post-command-hook #'markmacro-rect-monitor-post-command t))
-    (when markmacro-rect-start-point
-      (markmacro-rect-delete-overlays)
-
-      (let* ((start-point-info (save-excursion
-                                 (goto-char markmacro-rect-start-point)
-                                 (cons (line-number-at-pos) (current-column))))
-             (start-line (car start-point-info))
-             (start-column (cdr start-point-info))
-             (current-line (line-number-at-pos))
-             (current-column (current-column))
-             (rect-start-line (min start-line current-line))
-             (rect-end-line (max start-line current-line))
-             (rect-start-column (min start-column current-column))
-             (rect-end-column (max start-column current-column)))
-        (dotimes (i (1+ (- rect-end-line rect-start-line)))
-          (let ((overlay (make-overlay (save-excursion
-                                         (goto-line (+ rect-start-line i))
-                                         (move-to-column rect-start-column)
-                                         (point))
-                                       (save-excursion
-                                         (goto-line (+ rect-start-line i))
-                                         (move-to-column rect-end-column)
-                                         (point)))))
-            (overlay-put overlay 'face 'markmacro-mark-rect-face)
-            (add-to-list 'markmacro-rect-overlays overlay t)))))))
 
 (provide 'markmacro)
 
