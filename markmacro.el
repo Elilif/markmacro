@@ -152,7 +152,7 @@ This function has the following usages:
 2. mark all lines in a secondary region when it is active.
 3. mark all lines in the buffer by default."
   (interactive)
-  (when rectangle-mark-mode
+  (when (bound-and-true-p rectangle-mark-mode)
     (markmacro-secondary-region-set))
   (let ((bound (cond
                 ((region-active-p)
@@ -218,7 +218,7 @@ end column."
 (defun markmacro-secondary-region-set ()
   "Create secondary selection or a marker if no region available."
   (interactive)
-  (when rectangle-mark-mode
+  (when (bound-and-true-p rectangle-mark-mode)
     (setq-local markmacro-rect-used t))
   (if (region-active-p)
       (progn
