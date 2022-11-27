@@ -240,9 +240,15 @@ Usage:
 5. Call `markmacro-apply-all' apply kmacro to all mark entities."
   (interactive)
   (when-let
-      ((sec-region-start (overlay-start mouse-secondary-overlay))
-       (sec-region-end (overlay-end mouse-secondary-overlay))
-       (target (thing-at-point markmacro-secondary-region-mark-cursors-type t))
+      ((sec-region-start (or (overlay-start mouse-secondary-overlay)
+                             (point-min)))
+       (sec-region-end (or (overlay-end mouse-secondary-overlay)
+                           (point-max)))
+       (target (if (use-region-p)
+                   (buffer-substring-no-properties
+                    (region-beginning)
+                    (region-end))
+                 (thing-at-point markmacro-secondary-region-mark-cursors-type t)))
        (mark-bounds '(t))
        (current-point (point))
        (temp-bound 'bound))
