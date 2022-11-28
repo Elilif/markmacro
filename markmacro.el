@@ -340,8 +340,11 @@ Usage:
   (setq mouse-secondary-start (make-marker))
   (move-marker mouse-secondary-start (point))
 
-  (setq markmacro-mark-target-orig-info nil)
-  
+  (when markmacro-mark-target-orig-info
+    (goto-char (cdr markmacro-mark-target-orig-info))
+    (setq markmacro-mark-target-orig-info nil
+          markmacro-mark-target-last nil))
+
   (deactivate-mark t))
 
 (defun markmacro-delete-overlays ()
@@ -352,31 +355,41 @@ Usage:
 
 
 (defun markmacro-mark-target (direction)
+  (when (and markmacro-overlays
+             (not markmacro-mark-target-orig-info))
+    (end-kbd-macro)
+    (markmacro-exit))
   (when-let* ((lc last-command)
               (tc this-command)
+              (last-ov (car (last markmacro-overlays)))
+              (last-ov-beg (overlay-start last-ov))
+              (last-ov-end (overlay-end last-ov))
               markmacro-mark-target-orig-info)
-    (unless (eq tc lc)
+    (when (and (not (eq tc lc))
+               (not (eq lc 'markmacro-unmark-current-target)))
       (goto-char (if (eq tc 'markmacro-mark-current-or-next-target)
-                     (overlay-end markmacro-mark-target-last)
-                   (overlay-start markmacro-mark-target-last)))
-      (setq markmacro-mark-target-last (car (last markmacro-overlays)))))
+                     (cdar markmacro-mark-target-last)
+                   (caar markmacro-mark-target-last)))
+      (push (cons last-ov-beg last-ov-end) markmacro-mark-target-last)))
   (cond
-   (markmacro-mark-target-orig-info
-    (funcall direction (car markmacro-mark-target-orig-info) nil)
+   ((and markmacro-mark-target-orig-info
+         (funcall direction (car markmacro-mark-target-orig-info) nil t))
     (let* ((beg-pos (match-beginning 0))
            (end-pos (match-end 0))
-           (ov (make-overlay beg-pos end-pos)))
-      (overlay-put ov 'face 'markmacro-mark-face)
-      (add-to-list 'markmacro-overlays ov t)))
-   (t
+           ov)
+      (unless (cl-find beg-pos markmacro-overlays :key 'overlay-start)
+        (setq ov (make-overlay beg-pos end-pos))
+        (overlay-put ov 'face 'markmacro-mark-face)
+        (add-to-list 'markmacro-overlays ov t))))
+   ((not markmacro-mark-target-orig-info)
     (when-let* ((target (if (use-region-p)
                             (buffer-substring-no-properties
                              (region-beginning)
                              (region-end))
-                          (thing-at-point 'word)))
+                          (thing-at-point markmacro-secondary-region-mark-cursors-type)))
                 (target-bound (if (use-region-p)
                                   (cons (region-beginning) (region-end))
-                                (bounds-of-thing-at-point 'word)))
+                                (bounds-of-thing-at-point markmacro-secondary-region-mark-cursors-type)))
                 (ov (make-overlay (car target-bound) (cdr target-bound))))
       (deactivate-mark t)
       (advice-add 'keyboard-quit :before #'markmacro-exit)
@@ -388,8 +401,8 @@ Usage:
                    (car target-bound)))
       (overlay-put ov 'face 'markmacro-mark-face)
       (add-to-list 'markmacro-overlays ov t)
-      (setq markmacro-mark-target-last (car markmacro-overlays)))))
-  t)
+      (push target-bound markmacro-mark-target-last)))
+   (t)))
 
 (defun markmacro-mark-current-or-next-target ()
   (interactive)
