@@ -139,7 +139,7 @@ See `thing-at-point' for more information."
                       (> (point) last-point))
             (setq current-bound (bounds-of-thing-at-point 'word))
             (when current-bound
-              (add-to-list 'mark-bounds current-bound t))
+              (push current-bound mark-bounds))
             (setq last-point (point))
             (forward-word))))
 
@@ -183,12 +183,12 @@ This function has the following usages:
         (save-excursion
           (goto-char mark-bound-start)
           (dotimes (i (count-lines mark-bound-start mark-bound-end))
-            (unless (string-match-p "^[ ]*$" (buffer-substring-no-properties (point-at-bol) (point-at-eol)))
+            (unless (string-match-p "^[ ]*$" (buffer-substring-no-properties (line-beginning-position) (line-beginning-position)))
               (setq current-bound (if col-counts
                                       (cons (point) (+ (point) col-counts))
                                     (bounds-of-thing-at-point 'line)))
               (when current-bound
-                (add-to-list 'mark-bounds current-bound t)))
+                (push current-bound mark-bounds)))
 
             (unless (= i (1- (count-lines mark-bound-start mark-bound-end)))
               (line-move 1)))))
@@ -288,7 +288,7 @@ Usage:
                        (>= mend current-point))
                   (setq temp-bound (cons mstart mend))
                 (push (cons mstart mend) mark-bounds)))))))
-    (add-to-list 'mark-bounds temp-bound t)
+    (push temp-bound mark-bounds)
 
     (dolist (bound mark-bounds)
       (let* ((overlay (make-overlay (car bound) (cdr bound))))
