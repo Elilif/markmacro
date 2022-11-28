@@ -115,6 +115,7 @@ See `thing-at-point' for more information."
           (const :tag "Num" number))
   :group 'markmacro)
 
+;;;###autoload
 (defun markmacro-mark-words ()
   (interactive)
   (when markmacro-overlays
@@ -149,6 +150,7 @@ See `thing-at-point' for more information."
 
       (markmacro-select-last-overlay))))
 
+;;;###autoload
 (defun markmacro-mark-lines ()
   "Mark all lines and start kmacro recording.
 
@@ -223,6 +225,7 @@ end column."
              (<= current-column sr-end-column))
         (- sr-end-column sr-start-column))))
 
+;;;###autoload
 (defun markmacro-secondary-region-set ()
   "Create secondary selection or a marker if no region available."
   (interactive)
@@ -237,13 +240,15 @@ end column."
     (move-marker mouse-secondary-start (point)))
   (deactivate-mark t))
 
+;;;###autoload
 (defun markmacro-secondary-region-mark-cursors ()
   "Mark all in the region that is the same as the word under the cursor.
 
 Usage:
 1. Select a region.
 2. Call `markmacro-secondary-region-set'.
-3. Jump to an entity in the region, then Call `markmacro-secondary-region-mark-cursors'.
+3. Jump to an entity in the region, then Call
+`markmacro-secondary-region-mark-cursors'.
 4. Type something.
 5. Call `markmacro-apply-all' apply kmacro to all mark entities."
   (interactive)
@@ -310,10 +315,12 @@ Usage:
   (advice-add 'keyboard-quit :before #'markmacro-exit)
   (kmacro-start-macro 0))
 
+;;;###autoload
 (defun markmacro-apply-all ()
   (interactive)
   (markmacro-apply (if markmacro-mark-target-orig-info nil t)))
 
+;;;###autoload
 (defun markmacro-apply-all-except-first ()
   (interactive)
   (markmacro-apply nil))
@@ -330,6 +337,7 @@ Usage:
 
   (markmacro-exit))
 
+;;;###autoload
 (defun markmacro-exit ()
   (interactive)
   (advice-remove 'keyboard-quit #'markmacro-exit)
@@ -404,19 +412,21 @@ Usage:
       (push target-bound markmacro-mark-target-last)))
    (t)))
 
+;;;###autoload
 (defun markmacro-mark-current-or-next-target ()
   (interactive)
   (markmacro-mark-target 'search-forward))
 
+;;;###autoload
 (defun markmacro-mark-current-or-previous-target ()
   (interactive)
   (markmacro-mark-target 'search-backward))
 
+;;;###autoload
 (defun markmacro-unmark-current-target ()
   (interactive)
   (when markmacro-mark-target-orig-info
-    (let ((last-ov (car (last markmacro-overlays)))
-          (last-sec-ov (car (last markmacro-overlays 2))))
+    (let ((last-sec-ov (car (last markmacro-overlays 2))))
       (when (and (= (overlay-start last-sec-ov)
                     (caar markmacro-mark-target-last))
                  (length> markmacro-mark-target-last 1))
@@ -431,7 +441,7 @@ Usage:
     (goto-char (cdr markmacro-mark-target-orig-info)))
   (advice-remove 'kmacro-start-macro #'markmacro-mark-target-goto-orig-pos))
 
-
+;;;###autoload
 (defun markmacro-swap-region ()
   "Swap region and secondary selection."
   (interactive)
