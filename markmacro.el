@@ -117,6 +117,9 @@ See `thing-at-point' for more information."
 
 (defun markmacro-mark-words ()
   (interactive)
+  (when markmacro-overlays
+    (end-kbd-macro)
+    (markmacro-exit))
   (let ((bound (if (region-active-p)
                    (cons (region-beginning) (region-end))
                  (bounds-of-thing-at-point 'word)))
@@ -154,6 +157,9 @@ This function has the following usages:
 2. mark all lines in a secondary region when it is active.
 3. mark all lines in the buffer by default."
   (interactive)
+  (when markmacro-overlays
+    (end-kbd-macro)
+    (markmacro-exit))
   (when (bound-and-true-p rectangle-mark-mode)
     (markmacro-secondary-region-set))
   (let ((bound (cond
@@ -241,6 +247,12 @@ Usage:
 4. Type something.
 5. Call `markmacro-apply-all' apply kmacro to all mark entities."
   (interactive)
+  (cond
+   (markmacro-mark-target-orig-info
+    (markmacro-exit))
+   (markmacro-overlays
+    (end-kbd-macro)
+    (markmacro-exit)))
   (when-let
       ((sec-region-start (or (overlay-start mouse-secondary-overlay)
                              (point-min)))
