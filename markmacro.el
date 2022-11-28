@@ -412,10 +412,48 @@ Usage:
   (interactive)
   (markmacro-mark-target 'search-backward))
 
+(defun markmacro-unmark-current-target ()
+  (interactive)
+  (when markmacro-mark-target-orig-info
+    (let ((last-ov (car (last markmacro-overlays)))
+          (last-sec-ov (car (last markmacro-overlays 2))))
+      (when (and (= (overlay-start last-sec-ov)
+                    (caar markmacro-mark-target-last))
+                 (length> markmacro-mark-target-last 1))
+        (pop markmacro-mark-target-last))
+      (delete-overlay (car (last markmacro-overlays)))
+      (setq markmacro-overlays (butlast markmacro-overlays))
+      (goto-char (or (overlay-end last-sec-ov)
+                     (cdr markmacro-mark-target-orig-info))))))
+
 (defun markmacro-mark-target-goto-orig-pos (_arg)
   (when markmacro-mark-target-orig-info
     (goto-char (cdr markmacro-mark-target-orig-info)))
   (advice-remove 'kmacro-start-macro #'markmacro-mark-target-goto-orig-pos))
+
+
+(defun markmacro-swap-region ()
+  "Swap region and secondary selection."
+  (interactive)
+  (when-let* ((rbeg (region-beginning))
+              (rend (region-end))
+              (region-str (when (region-active-p) (buffer-substring-no-properties rbeg rend)))
+              (sel-str  (with-current-buffer (overlay-buffer mouse-secondary-overlay)
+                          (buffer-substring-no-properties
+                           (overlay-start mouse-secondary-overlay)
+                           (overlay-end mouse-secondary-overlay))))
+              (next-marker (make-marker)))
+    (when region-str (delete-region rbeg rend))
+    (when sel-str (insert sel-str))
+    (move-marker next-marker (point))
+    (with-current-buffer (overlay-buffer mouse-secondary-overlay)
+      (goto-char (overlay-start mouse-secondary-overlay))
+      (delete-region (overlay-start mouse-secondary-overlay) (overlay-end mouse-secondary-overlay))
+      (insert (or region-str "")))
+    (when (overlayp mouse-secondary-overlay)
+      (delete-overlay mouse-secondary-overlay))
+    (setq mouse-secondary-start next-marker)
+    (deactivate-mark t)))
 
 (provide 'markmacro)
 
