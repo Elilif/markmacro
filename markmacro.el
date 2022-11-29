@@ -139,10 +139,11 @@ See `thing-at-point' for more information."
                       (> (point) last-point))
             (setq current-bound (bounds-of-thing-at-point 'word))
             (when current-bound
-              (push current-bound mark-bounds))
+              (cl-pushnew current-bound mark-bounds :test 'equal))
             (setq last-point (point))
             (forward-word))))
-
+      
+      (setq mark-bounds (nreverse mark-bounds))
       (dolist (bound mark-bounds)
         (let* ((overlay (make-overlay (car bound) (cdr bound))))
           (overlay-put overlay 'face 'markmacro-mark-face)
@@ -183,16 +184,16 @@ This function has the following usages:
         (save-excursion
           (goto-char mark-bound-start)
           (dotimes (i (count-lines mark-bound-start mark-bound-end))
-            (unless (string-match-p "^[ ]*$" (buffer-substring-no-properties (line-beginning-position) (line-beginning-position)))
+            (unless (string-match-p "^[ ]*$" (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
               (setq current-bound (if col-counts
                                       (cons (point) (+ (point) col-counts))
                                     (bounds-of-thing-at-point 'line)))
               (when current-bound
-                (push current-bound mark-bounds)))
+                (cl-pushnew current-bound mark-bounds :test 'equal)))
 
             (unless (= i (1- (count-lines mark-bound-start mark-bound-end)))
               (line-move 1)))))
-
+      (setq mark-bounds (nreverse mark-bounds))
       (dolist (bound mark-bounds)
         (let* ((overlay (make-overlay (car bound) (cdr bound))))
           (overlay-put overlay 'face 'markmacro-mark-face)
@@ -283,13 +284,14 @@ Usage:
               (if (and (<= mstart current-point)
                        (>= mend current-point))
                   (setq temp-bound (cons mstart mend))
-                (push (cons mstart mend) mark-bounds))))
+                (cl-pushnew (cons mstart mend) mark-bounds :test 'equal))))
            (t (if (and (<= mstart current-point)
                        (>= mend current-point))
                   (setq temp-bound (cons mstart mend))
-                (push (cons mstart mend) mark-bounds)))))))
-    (push temp-bound mark-bounds)
-
+                (cl-pushnew (cons mstart mend) mark-bounds :test 'equal)))))))
+    
+    (cl-pushnew temp-bound mark-bounds :test 'equal)
+    (setq mark-bounds (nreverse mark-bounds))
     (dolist (bound mark-bounds)
       (let* ((overlay (make-overlay (car bound) (cdr bound))))
         (overlay-put overlay 'face 'markmacro-mark-face)
@@ -378,10 +380,13 @@ Usage:
       (goto-char (if (eq tc 'markmacro-mark-current-or-next-target)
                      (cdar markmacro-mark-target-last)
                    (caar markmacro-mark-target-last)))
-      (push (cons last-ov-beg last-ov-end) markmacro-mark-target-last)))
+      (cl-pushnew (cons last-ov-beg last-ov-end) markmacro-mark-target-last :test 'equal)))
   (cond
    ((and markmacro-mark-target-orig-info
-         (funcall direction (car markmacro-mark-target-orig-info) nil t))
+         (condition-case err
+             (funcall direction (car markmacro-mark-target-orig-info) nil)
+           (error (progn (message "%s: \"%s\"" (car err) (cadr err))
+                         nil))))
     (let* ((beg-pos (match-beginning 0))
            (end-pos (match-end 0))
            ov)
@@ -409,7 +414,7 @@ Usage:
                    (car target-bound)))
       (overlay-put ov 'face 'markmacro-mark-face)
       (add-to-list 'markmacro-overlays ov t)
-      (push target-bound markmacro-mark-target-last)))
+      (cl-pushnew target-bound markmacro-mark-target-last :test 'equal)))
    (t)))
 
 ;;;###autoload
