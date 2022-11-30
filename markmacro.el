@@ -408,7 +408,7 @@ Usage:
       (advice-add 'keyboard-quit :before #'markmacro-exit)
       (advice-add 'kmacro-start-macro :before #'markmacro-mark-target-goto-orig-pos)
       (setq markmacro-mark-target-orig-info
-            (cons target (car target-bound)))
+            (cons target (set-marker (point-marker) (car target-bound))))
       (goto-char (if (eq this-command 'markmacro-mark-current-or-next-target)
                      (cdr target-bound)
                    (car target-bound)))
