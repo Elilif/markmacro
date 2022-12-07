@@ -271,10 +271,12 @@ Usage:
                  (thing-at-point markmacro-secondary-region-mark-cursors-type t)))
        (mark-bounds '(t))
        (current-point (point))
-       (temp-bound 'bound))
+       (temp-bound 'bound)
+       case-fold-search)
     (save-excursion
       (goto-char sec-region-start)
       (pop mark-bounds)
+      (setq case-fold-search nil)
       (while (search-forward target sec-region-end t)
         (let ((mstart (match-beginning 0))
               (mend (match-end 0)))
@@ -384,7 +386,8 @@ Usage:
   (cond
    ((and markmacro-mark-target-orig-info
          (condition-case err
-             (funcall direction (car markmacro-mark-target-orig-info) nil)
+             (let ((case-fold-search nil))
+               (funcall direction (car markmacro-mark-target-orig-info) nil))
            (error (progn (message "%s: \"%s\"" (car err) (cadr err))
                          nil))))
     (let* ((beg-pos (match-beginning 0))
