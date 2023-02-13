@@ -274,6 +274,7 @@ Usage:
        (temp-bound 'bound)
        case-fold-search)
     (save-excursion
+      (deactivate-mark t)
       (goto-char sec-region-start)
       (pop mark-bounds)
       (setq case-fold-search nil)
